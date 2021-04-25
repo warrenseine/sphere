@@ -1,35 +1,42 @@
-import { Physics, useSphere } from "@react-three/cannon";
-import { PerspectiveCamera, useCubeTexture } from "@react-three/drei";
+import { useSpring } from "@react-spring/core";
+import { Physics, useBox, useSphere } from "@react-three/cannon";
+import {
+  MeshDistortMaterial,
+  PerspectiveCamera,
+  RoundedBox,
+  softShadows,
+  Stars,
+  useCubeTexture
+} from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Camera, Euler, Group, Mesh, Vector3 } from "three";
 import { KEY_LEFT, KEY_RIGHT, KEY_SPACE } from "keycode-js";
-import { useEffect, useRef, useState } from "react";
+import { Ref, useCallback, useEffect, useRef } from "react";
 import {
   atom,
   RecoilRoot,
   useRecoilState,
   useRecoilValue,
-  useSetRecoilState
+  useSetRecoilState,
 } from "recoil";
+import { Camera, Euler, Event, Group, Mesh, Quaternion, Vector3 } from "three";
 import "./App.css";
 import { useKeyDown, useKeyPress } from "./useKeyPress";
 
-type RigidBody = {
-  angularVelocity: Euler;
-  velocity: Vector3;
-  position: Vector3;
+type PlayerState = {
+  orbitOffset: Vector3;
 };
 
-const playerState = atom<RigidBody>({
+const playerState = atom<PlayerState>({
   key: "player",
   default: {
-    angularVelocity: new Euler(),
-    velocity: new Vector3(),
-    position: new Vector3(),
+    orbitOffset: new Vector3(),
   },
 });
 
-type BallState = RigidBody & {
+type BallState = {
+  angularVelocity: Euler;
+  velocity: Vector3;
+  position: Vector3;
   ballId: number;
 };
 
@@ -44,15 +51,61 @@ function getBallId() {
   return ++ballId;
 }
 
-function Pad(props: JSX.IntrinsicElements["mesh"]) {
-  const mesh = useRef<Mesh>(null!);
-  const [hovered, setHover] = useState(false);
-  const [active, setActive] = useState(false);
+function Sphere(props: JSX.IntrinsicElements["mesh"]) {
+  const [ref] = useSphere(() => ({
+    args: 1, // radius
+    mass: 1,
+    type: "Static",
+  }));
+
+  return (
+    <mesh {...props} ref={ref} receiveShadow>
+      <sphereGeometry args={[1, 32, 32]} />
+      <meshPhongMaterial color="hotpink" />
+    </mesh>
+  );
+}
+
+function Player(props: JSX.IntrinsicElements["group"]) {
+  const leftPressed = useKeyDown(KEY_LEFT);
+  const rightPressed = useKeyDown(KEY_RIGHT);
+  const padGroup = useRef<Group>(null!);
+  const camera = useRef<Camera>(null!);
+  const [player, setPlayer] = useRecoilState(playerState);
+  const padSize: [number, number, number] = [1, 0.2, 0.1];
+  const [ref, api] = useBox(() => ({
+    args: padSize,
+    mass: 1,
+    position: [0, 0, 4],
+    rotation: [Math.PI, 0, 0],
+    type: "Static",
+    onCollide: collide,
+  }));
+
   const setBalls = useSetRecoilState(ballState);
 
+  const { distort } = useSpring({
+    to: { distort: 0 },
+    from: { distort: 0.4 },
+    config: { duration: 1500 },
+  });
+
+  const collide = useCallback(
+    (e: Event) => {
+      distort.reset();
+    },
+    [distort]
+  );
+
   useKeyPress(KEY_SPACE, () => {
-    const velocity = mesh.current.getWorldDirection(new Vector3());
-    const position = mesh.current.getWorldPosition(new Vector3());
+    const direction = ref
+      .current!.getWorldDirection(new Vector3())
+      .normalize()
+      .multiplyScalar(-1);
+    const velocity = direction.clone().multiplyScalar(1.5);
+    const position = ref
+      .current!.getWorldPosition(new Vector3())
+      .add(direction);
 
     const newBall: BallState = {
       angularVelocity: new Euler(),
@@ -65,65 +118,70 @@ function Pad(props: JSX.IntrinsicElements["mesh"]) {
   });
 
   useFrame((state, delta) => {
-    if (mesh.current) mesh.current.rotation.x += 0.01;
-  });
-
-  return (
-    <mesh
-      {...props}
-      ref={mesh}
-      scale={active ? 1.5 : 1}
-      onClick={(event) => setActive(!active)}
-      onPointerOver={(event) => setHover(true)}
-      onPointerOut={(event) => setHover(false)}
-    >
-      <boxGeometry args={[1, 0.2, 0.1]} />
-      <meshStandardMaterial color={hovered ? "hotpink" : "orange"} />
-    </mesh>
-  );
-}
-
-function Sphere(props: JSX.IntrinsicElements["mesh"]) {
-  const mesh = useRef<Mesh>(null!);
-
-  // useFrame((state, delta) => (mesh.current.rotation.x += 0.01));
-
-  return (
-    <mesh {...props} ref={mesh}>
-      <sphereGeometry args={[1, 32, 32]} />
-      <meshStandardMaterial color="hotpink" />
-    </mesh>
-  );
-}
-
-const playerPadOffsetPosition = new Vector3(0, -0.5, 4);
-
-function Player(props: JSX.IntrinsicElements["group"]) {
-  const leftPressed = useKeyDown(KEY_LEFT);
-  const rightPressed = useKeyDown(KEY_RIGHT);
-  const padGroup = useRef<Group>(null!);
-  const camera = useRef<Camera>(null!);
-  const [player, setPlayer] = useRecoilState(playerState);
-
-  useFrame(() => {
-    const angularVelocity = new Euler(
+    const orbitVelocity = new Vector3(
       0,
-      leftPressed ? 1 : rightPressed ? -1 : 0,
+      leftPressed ? -1 : rightPressed ? 1 : 0,
       0
     );
-    setPlayer({ ...player, angularVelocity });
+    const orbitOffset = player.orbitOffset
+      .clone()
+      .addScaledVector(orbitVelocity, delta);
+
+    setPlayer({ orbitOffset });
   });
 
   useFrame((state, delta) => {
-    padGroup.current.rotation.y += delta * player.angularVelocity.y;
+    const quaternion = new Quaternion();
+    quaternion.setFromAxisAngle(new Vector3(0, 1, 0), player.orbitOffset.y);
+
+    const euler = new Euler();
+    euler.setFromQuaternion(quaternion);
+
+    api.rotation.copy(euler);
+
+    const translationOffset = new Vector3(0, 0, 4);
+
+    // Use quaternion to rotate the relative vector.
+    const translation = translationOffset.applyQuaternion(quaternion);
+
+    api.position.copy(translation);
   });
+
+  useEffect(() => {
+    const mesh = ref.current!;
+    mesh.addEventListener("collide", collide);
+    return () => mesh.removeEventListener("collide", collide);
+  }, [ref, collide]);
 
   return (
     <group ref={padGroup} {...props}>
-      <Pad position={playerPadOffsetPosition} />
-      <PerspectiveCamera makeDefault ref={camera} position={[0, 0, 6]}>
-        <mesh />
-      </PerspectiveCamera>
+      <RoundedBox
+        args={padSize} // Width, Height and Depth of the box
+        radius={0.05} // Border-Radius of the box
+        smoothness={8} // Optional, number of subdivisions
+        ref={ref as Ref<Mesh>} // All THREE.Mesh props are valid
+        receiveShadow
+      >
+        <meshPhongMaterial attach="material" color="#f3f3f3" wireframe />
+        {/* <MeshWobbleMaterial
+          color="orange"
+          attach="material"
+          factor={0.2} // Strength, 0 disables the effect (default=1)
+          speed={2} // Speed (default=1)
+        /> */}
+        <MeshDistortMaterial
+          color="orange"
+          attach="material"
+          distort={distort.get()} // Strength, 0 disables the effect (default=1)
+          speed={10} // Speed (default=1)
+        />
+        <PerspectiveCamera
+          makeDefault
+          ref={camera}
+          position={[0, 1, 2]}
+          rotation={[-Math.PI / 16, 0, 0]}
+        />
+      </RoundedBox>
     </group>
   );
 }
@@ -159,30 +217,58 @@ function Balls(props: JSX.IntrinsicElements["group"]) {
 
 function Ball(props: JSX.IntrinsicElements["mesh"] & { ball: BallState }) {
   const ball = props.ball;
+  const ballRadius = 0.2;
 
   const [ref] = useSphere(() => ({
-    args: 0.2, // radius
+    args: ballRadius,
     mass: 1,
     position: ball.position.toArray(),
     velocity: ball.velocity.toArray(),
   }));
 
   return (
-    <mesh {...props} ref={ref} scale={0.2}>
+    <mesh {...props} ref={ref} scale={ballRadius} castShadow>
       <sphereGeometry args={[1, 16, 16]} />
-      <meshStandardMaterial color="green" />
+      <meshPhongMaterial color="green" />
     </mesh>
   );
 }
 
+softShadows({
+  frustum: 3.75, // Frustum width (default: 3.75) must be a float
+  size: 0.005, // World size (default: 0.005) must be a float
+  near: 9.5, // Near plane (default: 9.5) must be a float
+  samples: 17, // Samples (default: 17) must be a int
+  rings: 11, // Rings (default: 11) must be a int
+});
+
 export default function App() {
   return (
-    <Canvas>
+    <Canvas style={{ backgroundColor: "#121212" }} shadows>
       <RecoilRoot>
-        <Physics gravity={[0, 0, 0]}>
+        <Physics
+          gravity={[0, 0, 0]}
+          defaultContactMaterial={{
+            friction: 0,
+            restitution: 1,
+          }}
+        >
           <ambientLight />
-          <pointLight position={[30, 10, 10]} />
-          <SkyBox />
+          <pointLight
+            position={[30, 10, 10]}
+            castShadow
+            shadow-mapSize-width={4096}
+            shadow-mapSize-height={4096}
+          />
+          {/* <SkyBox /> */}
+          <Stars
+            radius={100} // Radius of the inner sphere (default=100)
+            depth={50} // Depth of area where stars should fit (default=50)
+            count={5000} // Amount of stars (default=5000)
+            factor={4} // Size factor (default=4)
+            saturation={0} // Saturation 0-1 (default=0)
+            fade // Faded dots (default=false)
+          />
           <Balls />
           <Sphere position={[0, 0, 0]} />
           <Player position={[0, 0, 0]} />
