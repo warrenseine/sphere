@@ -6,7 +6,6 @@ import {
   RoundedBox,
   softShadows,
   Stars,
-  useCubeTexture
 } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { KEY_LEFT, KEY_RIGHT, KEY_SPACE } from "keycode-js";
@@ -186,23 +185,6 @@ function Player(props: JSX.IntrinsicElements["group"]) {
   );
 }
 
-function SkyBox() {
-  const { scene } = useThree();
-  const cubeMapTexture = useCubeTexture(Array(6).fill("skybox.jpg"), {
-    path: "./",
-  });
-
-  useEffect(() => {
-    const previous = scene.background;
-    scene.background = cubeMapTexture;
-    return () => {
-      scene.background = previous;
-    };
-  }, [cubeMapTexture, scene]);
-
-  return null;
-}
-
 function Balls(props: JSX.IntrinsicElements["group"]) {
   const balls = useRecoilValue(ballState);
 
@@ -260,7 +242,6 @@ export default function App() {
             shadow-mapSize-width={4096}
             shadow-mapSize-height={4096}
           />
-          {/* <SkyBox /> */}
           <Stars
             radius={100} // Radius of the inner sphere (default=100)
             depth={50} // Depth of area where stars should fit (default=50)
