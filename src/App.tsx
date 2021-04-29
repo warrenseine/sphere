@@ -37,6 +37,7 @@ type BallState = {
   angularVelocity: Euler;
   velocity: Vector3;
   position: Vector3;
+  color: string;
   ballId: number;
 };
 
@@ -49,6 +50,20 @@ const ballState = atom<BallState[]>({
 let ballId = 0;
 function getBallId() {
   return ++ballId;
+}
+
+const ballColors = [
+  "rgb(249, 65, 68)",
+  "rgb(243, 114, 44)",
+  "rgb(248, 150, 30)",
+  "rgb(249, 199, 79)",
+  "rgb(144, 190, 109)",
+  "rgb(67, 170, 139)",
+  "rgb(87, 117, 144)",
+];
+
+function getBallColor(ballId: number) {
+  return ballColors[ballId % ballColors.length];
 }
 
 function Sphere(props: JSX.IntrinsicElements["mesh"]) {
@@ -106,12 +121,15 @@ function Player(props: JSX.IntrinsicElements["group"]) {
     const position = ref
       .current!.getWorldPosition(new Vector3())
       .add(direction);
+    const ballId = getBallId();
+    const color = getBallColor(ballId);
 
     const newBall: BallState = {
       angularVelocity: new Euler(),
       velocity,
       position,
-      ballId: getBallId(),
+      color,
+      ballId,
     };
 
     setBalls((balls) => [...balls, newBall].slice(-3));
@@ -206,7 +224,7 @@ function Ball(props: JSX.IntrinsicElements["mesh"] & { ball: BallState }) {
   return (
     <mesh {...props} ref={ref} scale={ballRadius} castShadow>
       <sphereGeometry args={[1, 16, 16]} />
-      <meshToonMaterial attach="material" color="green" />
+      <meshToonMaterial attach="material" color={ball.color} />
     </mesh>
   );
 }
