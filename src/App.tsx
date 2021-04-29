@@ -7,7 +7,8 @@ import {
   softShadows,
   Stars,
 } from "@react-three/drei";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { EffectComposer, Glitch, Vignette } from "@react-three/postprocessing";
 import { KEY_LEFT, KEY_RIGHT, KEY_SPACE } from "keycode-js";
 import { Ref, useCallback, useEffect, useRef } from "react";
 import {
@@ -236,19 +237,26 @@ export default function App() {
             shadow-mapSize-width={4096}
             shadow-mapSize-height={4096}
           />
-          <Stars
-            radius={100} // Radius of the inner sphere (default=100)
-            depth={50} // Depth of area where stars should fit (default=50)
-            count={5000} // Amount of stars (default=5000)
-            factor={4} // Size factor (default=4)
-            saturation={0} // Saturation 0-1 (default=0)
-            fade // Faded dots (default=false)
-          />
           <Balls />
           <Sphere position={[0, 0, 0]} />
           <Player position={[0, 0, 0]} />
         </Physics>
       </RecoilRoot>
+      <EffectComposer multisampling={0}>
+        <Glitch
+          active // turn on/off the effect (switches between "mode" prop and GlitchMode.DISABLED)
+          ratio={0.85} // Threshold for strong glitches, 0 - no weak glitches, 1 - no strong glitches.
+        />
+        <Stars
+          radius={100} // Radius of the inner sphere (default=100)
+          depth={50} // Depth of area where stars should fit (default=50)
+          count={5000} // Amount of stars (default=5000)
+          factor={4} // Size factor (default=4)
+          saturation={0} // Saturation 0-1 (default=0)
+          fade // Faded dots (default=false)
+        />
+        <Vignette eskil={false} offset={0.1} darkness={1.1} />
+      </EffectComposer>
     </Canvas>
   );
 }
