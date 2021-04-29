@@ -60,7 +60,7 @@ function Sphere(props: JSX.IntrinsicElements["mesh"]) {
   return (
     <mesh {...props} ref={ref} receiveShadow>
       <sphereGeometry args={[1, 32, 32]} />
-      <meshPhongMaterial color="hotpink" />
+      <meshToonMaterial attach="material" color="hotpink" />
     </mesh>
   );
 }
@@ -161,13 +161,7 @@ function Player(props: JSX.IntrinsicElements["group"]) {
         ref={ref as Ref<Mesh>} // All THREE.Mesh props are valid
         receiveShadow
       >
-        <meshPhongMaterial attach="material" color="#f3f3f3" wireframe />
-        {/* <MeshWobbleMaterial
-          color="orange"
-          attach="material"
-          factor={0.2} // Strength, 0 disables the effect (default=1)
-          speed={2} // Speed (default=1)
-        /> */}
+        <meshPhongMaterial attach="material" color="#f3f3f3" />
         <MeshDistortMaterial
           color="orange"
           attach="material"
@@ -211,7 +205,7 @@ function Ball(props: JSX.IntrinsicElements["mesh"] & { ball: BallState }) {
   return (
     <mesh {...props} ref={ref} scale={ballRadius} castShadow>
       <sphereGeometry args={[1, 16, 16]} />
-      <meshPhongMaterial color="green" />
+      <meshToonMaterial attach="material" color="green" />
     </mesh>
   );
 }
