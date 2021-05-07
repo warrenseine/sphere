@@ -16,8 +16,14 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { List, Map, Set } from "immutable";
-import { KEY_G, KEY_LEFT, KEY_RIGHT, KEY_SPACE } from "keycode-js";
-import { BlendFunction } from "postprocessing";
+import {
+  KEY_DOWN,
+  KEY_G,
+  KEY_LEFT,
+  KEY_RIGHT,
+  KEY_SPACE,
+  KEY_UP,
+} from "keycode-js";
 import {
   MutableRefObject,
   Ref,
@@ -43,11 +49,11 @@ import "./App.css";
 import { useKeyDown, useKeyPress } from "./useKeyPress";
 
 type Player = {
-  orbitOffset: Vector3;
+  orientation: Quaternion;
 };
 
 const createPlayer = (): Player => ({
-  orbitOffset: new Vector3(0, 0, 4),
+  orientation: new Quaternion(),
 });
 
 const ballColors = [
@@ -83,10 +89,13 @@ const createBall = (
 });
 
 const createBallFromPlayer = (ballId: number, player: Player): Ball => {
-  const [rotation, translation] = orbitAround(player.orbitOffset);
-  const direction = rotation.toVector3().normalize().multiplyScalar(-1);
-  const velocity = direction.clone().multiplyScalar(1.5);
-  const position = translation.add(direction);
+  const translation = new Vector3(0, 0, 3);
+  const direction = new Vector3(0, 0, -1);
+
+  const position = translation.applyQuaternion(player.orientation);
+  const velocity = direction
+    .applyQuaternion(player.orientation)
+    .multiplyScalar(2);
 
   return createBall(ballId, position, velocity);
 };
@@ -104,11 +113,22 @@ const createBrick = (brickId: number, orbitOffset: Vector3): Brick => ({
   color: getBallColor(brickId),
 });
 
-const createRandomBrick = (brickId: number): Brick =>
-  createBrick(
+const createRandomBrick = (brickId: number): Brick => {
+  const brickWidth = 0.4;
+  const brickGap = 0.2;
+  const maxBricks = Math.floor((2 * Math.PI) / (brickWidth + brickGap));
+  const positionX = Math.floor(Math.random() * maxBricks);
+  const positionY = Math.floor(Math.random() * maxBricks);
+
+  return createBrick(
     brickId,
-    new Vector3(Math.random() * 2 * Math.PI, Math.random() * 2 * Math.PI, 1.5)
+    new Vector3(
+      positionX * (brickWidth + brickGap) + brickGap / 2,
+      positionY * (brickWidth + brickGap) + brickGap / 2,
+      1.5
+    )
   );
+};
 
 type Object3DRef = MutableRefObject<Object3D | undefined>;
 interface AppState extends State {
@@ -126,7 +146,9 @@ interface AppState extends State {
     movePlayer: (
       delta: number,
       leftPressed: boolean,
-      rightPressed: boolean
+      rightPressed: boolean,
+      upPressed: boolean,
+      downPressed: boolean
     ) => void;
     addOutlineSelection: (mesh: Object3DRef) => void;
     removeOutlineSelection: (mesh: Object3DRef) => void;
@@ -146,7 +168,7 @@ const useStore = create<AppState>((set, get) => ({
       set((state) => {
         const ball = createBallFromPlayer(state.nextBallId, state.player);
         return {
-          balls: state.balls.shift().push(ball),
+          balls: state.balls.push(ball).slice(-3),
           nextBallId: state.nextBallId + 1,
         };
       }),
@@ -167,19 +189,37 @@ const useStore = create<AppState>((set, get) => ({
           ...changes,
         })),
       })),
-    movePlayer: (delta: number, leftPressed: boolean, rightPressed: boolean) =>
+    movePlayer: (
+      delta: number,
+      leftPressed: boolean,
+      rightPressed: boolean,
+      upPressed: boolean,
+      downPressed: boolean
+    ) =>
       set((state) => {
-        const orbitVelocity = new Vector3(
-          0,
-          leftPressed ? -1 : rightPressed ? 1 : 0,
-          0
+        const verticalAngle = delta * (downPressed ? -1 : upPressed ? 1 : 0);
+        const verticalAxis = new Vector3(-1, 0, 0);
+        const verticalRotation = new Quaternion().setFromAxisAngle(
+          verticalAxis,
+          verticalAngle
         );
-        const orbitOffset = state.player.orbitOffset
+
+        const horizontalAngle =
+          delta * (leftPressed ? -1 : rightPressed ? 1 : 0);
+        const horizontalAxis = new Vector3(0, 1, 0);
+        const horizontalRotation = new Quaternion().setFromAxisAngle(
+          horizontalAxis,
+          horizontalAngle
+        );
+
+        const orientation = state.player.orientation
           .clone()
-          .addScaledVector(orbitVelocity, delta);
+          .multiply(verticalRotation)
+          .multiply(horizontalRotation);
+
         return {
           player: {
-            orbitOffset,
+            orientation,
           },
         };
       }),
@@ -199,8 +239,13 @@ const useStore = create<AppState>((set, get) => ({
 }));
 
 function orbitAround(orbitOffset: Vector3): [Euler, Vector3] {
-  const quaternion = new Quaternion();
-  quaternion.setFromAxisAngle(new Vector3(0, 1, 0), orbitOffset.y);
+  const quaternionX = new Quaternion();
+  quaternionX.setFromAxisAngle(new Vector3(1, 0, 0), orbitOffset.x);
+
+  const quaternionY = new Quaternion();
+  quaternionY.setFromAxisAngle(new Vector3(0, 1, 0), orbitOffset.y);
+
+  const quaternion = quaternionX.multiply(quaternionY);
 
   const euler = new Euler();
   euler.setFromQuaternion(quaternion);
@@ -237,16 +282,20 @@ function PlayerGroup() {
   );
   const leftPressed = useKeyDown(KEY_LEFT);
   const rightPressed = useKeyDown(KEY_RIGHT);
+  const upPressed = useKeyDown(KEY_UP);
+  const downPressed = useKeyDown(KEY_DOWN);
   const padGroup = useRef<Group>(null!);
   const camera = useRef<Camera>(null!);
   const player = useStore((state) => state.player);
   const movePlayer = useStore((state) => state.actions.movePlayer);
   const addBall = useStore((state) => state.actions.addBall);
   const padSize: [number, number, number] = [1, 0.2, 0.1];
+  const translation = new Vector3(0, 0, 4);
+
   const [ref, api] = useBox(() => ({
     args: padSize,
     mass: 1,
-    position: player.orbitOffset.toArray(),
+    position: translation.toArray(),
     rotation: [Math.PI, 0, 0],
     type: "Static",
     onCollide: collide,
@@ -263,9 +312,10 @@ function PlayerGroup() {
   useKeyPress(KEY_SPACE, addBall);
 
   useFrame((state, delta) => {
-    movePlayer(delta, leftPressed, rightPressed);
+    movePlayer(delta, leftPressed, rightPressed, upPressed, downPressed);
 
-    const [rotation, position] = orbitAround(player.orbitOffset);
+    const rotation = new Euler().setFromQuaternion(player.orientation);
+    const position = translation.clone().applyQuaternion(player.orientation);
 
     api.rotation.copy(rotation);
     api.position.copy(position);
@@ -291,7 +341,7 @@ function PlayerGroup() {
         ref={ref as Ref<Mesh>} // All THREE.Mesh props are valid
         receiveShadow
       >
-        <meshPhongMaterial attach="material" color="#f3f3f3" />
+        <meshToonMaterial attach="material" color="#f3f3f3" />
         <MeshDistortMaterial
           color="orange"
           attach="material"
@@ -322,6 +372,12 @@ function BallGroup(props: JSX.IntrinsicElements["group"]) {
 }
 
 function BallMesh({ ball }: { ball: Ball }) {
+  const addOutlineSelection = useStore(
+    (state) => state.actions.addOutlineSelection
+  );
+  const removeOutlineSelection = useStore(
+    (state) => state.actions.removeOutlineSelection
+  );
   const ballRadius = 0.2;
 
   const [ref] = useSphere(() => ({
@@ -330,6 +386,11 @@ function BallMesh({ ball }: { ball: Ball }) {
     position: ball.position.toArray(),
     velocity: ball.velocity.toArray(),
   }));
+
+  useEffect(() => {
+    addOutlineSelection(ref);
+    return () => removeOutlineSelection(ref);
+  }, [ref, addOutlineSelection, removeOutlineSelection]);
 
   return (
     <mesh ref={ref} scale={ballRadius} castShadow>
@@ -362,7 +423,7 @@ function BrickMesh({ brick }: { brick: Brick }) {
     brick,
   ]);
   const brickSize: [number, number, number] = [0.4, 0.4, 0.1];
-  const [ref, api] = useBox(
+  const [ref] = useBox(
     () => ({
       args: brickSize,
       mass: 1,
@@ -409,12 +470,15 @@ function Effects() {
   return (
     <Suspense fallback={null}>
       <EffectComposer multisampling={0} autoClear={false}>
-        { gPressed ?
-        <Glitch
-          active={true} // turn on/off the effect (switches between "mode" prop and GlitchMode.DISABLED)
-          ratio={0.85} // Threshold for strong glitches, 0 - no weak glitches, 1 - no strong glitches.
-          delay={new Vector2(0, 0)}
-        /> : <SMAA /> }
+        {gPressed ? (
+          <Glitch
+            active={true} // turn on/off the effect (switches between "mode" prop and GlitchMode.DISABLED)
+            ratio={0.85} // Threshold for strong glitches, 0 - no weak glitches, 1 - no strong glitches.
+            delay={new Vector2(0, 0)}
+          />
+        ) : (
+          <SMAA />
+        )}
         <Outline
           selection={outlineSelectionArray}
           edgeStrength={10} // the edge strength
@@ -444,6 +508,7 @@ function Effects() {
 // color combination to build
 // special bricks to add new colors to other players
 // special brick to shuffle players
+// color bricks (splatoon style)
 
 softShadows({
   frustum: 3.75, // Frustum width (default: 3.75) must be a float
@@ -458,10 +523,7 @@ export default function App() {
   useEffect(resetGame, [resetGame]);
 
   return (
-    <Canvas
-      style={{ backgroundColor: "#121212" }}
-      shadows
-    >
+    <Canvas style={{ backgroundColor: "#121212" }} shadows>
       <Physics
         gravity={[0, 0, 0]}
         defaultContactMaterial={{
@@ -469,9 +531,15 @@ export default function App() {
           restitution: 1,
         }}
       >
-        <ambientLight />
+        {/* <ambientLight /> */}
         <pointLight
           position={[30, 10, 10]}
+          castShadow
+          shadow-mapSize-width={4096}
+          shadow-mapSize-height={4096}
+        />
+        <pointLight
+          position={[-20, -30, 5]}
           castShadow
           shadow-mapSize-width={4096}
           shadow-mapSize-height={4096}
