@@ -48,7 +48,7 @@ import {
 } from "three";
 import create, { State } from "zustand";
 import "./App.css";
-import { useKeyDown, useKeyPress } from "./useKeyPress";
+import { useKeyDown, useKeyPress, useTouch, TouchPosition } from "./useInput";
 
 type Player = {
   orientation: Quaternion;
@@ -150,7 +150,8 @@ interface AppState extends State {
       leftPressed: boolean,
       rightPressed: boolean,
       upPressed: boolean,
-      downPressed: boolean
+      downPressed: boolean,
+      touchPosition: TouchPosition
     ) => void;
     addOutlineSelection: (mesh: Object3DRef) => void;
     removeOutlineSelection: (mesh: Object3DRef) => void;
@@ -196,22 +197,26 @@ const useStore = create<AppState>((set, get) => ({
       leftPressed: boolean,
       rightPressed: boolean,
       upPressed: boolean,
-      downPressed: boolean
+      downPressed: boolean,
+      touchPosition: TouchPosition
     ) =>
       set((state) => {
-        const verticalAngle = delta * (downPressed ? -1 : upPressed ? 1 : 0);
+        const [horizontalAngle, verticalAngle] = getAngleFromInput(
+          leftPressed,
+          rightPressed,
+          upPressed,
+          downPressed,
+          touchPosition
+        );
         const verticalAxis = new Vector3(-1, 0, 0);
         const verticalRotation = new Quaternion().setFromAxisAngle(
           verticalAxis,
-          verticalAngle
+          verticalAngle * delta
         );
-
-        const horizontalAngle =
-          delta * (leftPressed ? -1 : rightPressed ? 1 : 0);
         const horizontalAxis = new Vector3(0, 1, 0);
         const horizontalRotation = new Quaternion().setFromAxisAngle(
           horizontalAxis,
-          horizontalAngle
+          horizontalAngle * delta
         );
 
         const orientation = state.player.orientation
@@ -239,6 +244,24 @@ const useStore = create<AppState>((set, get) => ({
     },
   },
 }));
+
+function getAngleFromInput(
+  leftPressed: boolean,
+  rightPressed: boolean,
+  upPressed: boolean,
+  downPressed: boolean,
+  touchPosition: TouchPosition
+): [number, number] {
+  if (touchPosition) {
+    const verticalAngle =
+      ((window.innerHeight - touchPosition.y) / window.innerHeight - 0.5) * 2;
+    const horizontalAngle = (touchPosition.x / window.innerWidth - 0.5) * 2;
+    return [horizontalAngle, verticalAngle];
+  }
+  const verticalAngle = downPressed ? -1 : upPressed ? 1 : 0;
+  const horizontalAngle = leftPressed ? -1 : rightPressed ? 1 : 0;
+  return [horizontalAngle, verticalAngle];
+}
 
 function orbitAround(orbitOffset: Vector3): [Euler, Vector3] {
   const quaternionX = new Quaternion();
@@ -286,6 +309,7 @@ function PlayerGroup() {
   const rightPressed = useKeyDown(KEY_RIGHT);
   const upPressed = useKeyDown(KEY_UP);
   const downPressed = useKeyDown(KEY_DOWN);
+  const touchPosition = useTouch();
   const padGroup = useRef<Group>(null!);
   const camera = useRef<Camera>(null!);
   const player = useStore((state) => state.player);
@@ -314,7 +338,14 @@ function PlayerGroup() {
   useKeyPress(KEY_SPACE, addBall);
 
   useFrame((state, delta) => {
-    movePlayer(delta, leftPressed, rightPressed, upPressed, downPressed);
+    movePlayer(
+      delta,
+      leftPressed,
+      rightPressed,
+      upPressed,
+      downPressed,
+      touchPosition
+    );
 
     const rotation = new Euler().setFromQuaternion(player.orientation);
     const position = translation.clone().applyQuaternion(player.orientation);
