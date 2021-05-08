@@ -538,18 +538,11 @@ export default function App() {
           restitution: 1,
         }}
       >
-        {/* <ambientLight /> */}
         <pointLight
           position={[30, 10, 10]}
           castShadow
-          shadow-mapSize-width={4096}
-          shadow-mapSize-height={4096}
-        />
-        <pointLight
-          position={[-20, -30, 5]}
-          castShadow
-          shadow-mapSize-width={4096}
-          shadow-mapSize-height={4096}
+          shadow-mapSize-width={256}
+          shadow-mapSize-height={256}
         />
         <SphereMesh />
         <BallGroup />
