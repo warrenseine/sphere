@@ -1,8 +1,6 @@
-import { useSpring } from "@react-spring/core";
 import { Physics, useBox, useSphere } from "@react-three/cannon";
 import {
   AdaptiveDpr,
-  MeshDistortMaterial,
   PerspectiveCamera,
   RoundedBox,
   softShadows,
@@ -327,13 +325,7 @@ function PlayerGroup() {
     onCollide: collide,
   }));
 
-  const { distort } = useSpring({
-    to: { distort: 0 },
-    from: { distort: 0.4 },
-    config: { duration: 1500 },
-  });
-
-  const collide = useCallback((e: Event) => distort.reset(), [distort]);
+  const collide = useCallback((e: Event) => {}, []);
 
   useKeyPress(KEY_SPACE, addBall);
 
@@ -375,12 +367,6 @@ function PlayerGroup() {
         receiveShadow
       >
         <meshToonMaterial attach="material" color="#f3f3f3" />
-        <MeshDistortMaterial
-          color="orange"
-          attach="material"
-          distort={distort.get()} // Strength, 0 disables the effect (default=1)
-          speed={10} // Speed (default=1)
-        />
         <PerspectiveCamera
           makeDefault
           ref={camera}
