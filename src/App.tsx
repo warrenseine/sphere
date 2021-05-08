@@ -1,11 +1,13 @@
 import { useSpring } from "@react-spring/core";
 import { Physics, useBox, useSphere } from "@react-three/cannon";
 import {
+  AdaptiveDpr,
   MeshDistortMaterial,
   PerspectiveCamera,
   RoundedBox,
   softShadows,
   Stars,
+  Stats,
 } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import {
@@ -524,6 +526,11 @@ export default function App() {
 
   return (
     <Canvas style={{ backgroundColor: "#121212" }} shadows>
+      <Stats
+        showPanel={0} // Start-up panel (default=0)
+        className="stats" // Optional className to add to the stats container dom element
+      />
+      <AdaptiveDpr pixelated />
       <Physics
         gravity={[0, 0, 0]}
         defaultContactMaterial={{
