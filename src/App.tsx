@@ -552,7 +552,7 @@ export default function App() {
         gravity={[0, 0, 0]}
         defaultContactMaterial={{
           friction: 0,
-          restitution: 1,
+          restitution: 1.1,
         }}
       >
         <pointLight
