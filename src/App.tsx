@@ -399,6 +399,7 @@ function PlayerGroup() {
         args={padSize} // Width, Height and Depth of the box
         radius={0.05} // Border-Radius of the box
         ref={ref as Ref<Mesh>} // All THREE.Mesh props are valid
+        onClick={addBall}
         receiveShadow
       >
         <meshToonMaterial attach="material" color="#f3f3f3" />
