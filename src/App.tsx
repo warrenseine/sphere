@@ -317,33 +317,6 @@ function orbitAround(orbitOffset: Vector3): [Euler, Vector3] {
   return [euler, translation];
 }
 
-function SphereMesh() {
-  const addOutlineSelection = useStore(
-    (state) => state.actions.addOutlineSelection
-  );
-  const removeOutlineSelection = useStore(
-    (state) => state.actions.removeOutlineSelection
-  );
-
-  const [ref] = useSphere(() => ({
-    args: 1, // radius
-    mass: 1,
-    type: "Static",
-  }));
-
-  useEffect(() => {
-    addOutlineSelection(ref);
-    return () => removeOutlineSelection(ref);
-  }, [ref, addOutlineSelection, removeOutlineSelection]);
-
-  return (
-    <mesh position={[0, 0, 0]} ref={ref} receiveShadow>
-      <sphereGeometry args={[1, 32, 32]} />
-      <meshToonMaterial attach="material" color="hotpink" />
-    </mesh>
-  );
-}
-
 function PlayerGroup() {
   const addOutlineSelection = useStore(
     (state) => state.actions.addOutlineSelection
@@ -623,7 +596,6 @@ export default function App() {
           shadow-mapSize-width={256}
           shadow-mapSize-height={256}
         />
-        <SphereMesh />
         <BallGroup />
         <BrickGroup />
         <PlayerGroup />
