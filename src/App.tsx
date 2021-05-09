@@ -7,7 +7,7 @@ import {
   Stars,
   Stats,
 } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   EffectComposer,
   Glitch,
@@ -565,6 +565,20 @@ function Effects() {
 // special brick to shuffle players
 // color bricks (splatoon style)
 
+function ViewportResize() {
+  const { gl, viewport } = useThree();
+  const targetSize = new Vector2(1024, 1024 / viewport.aspect);
+
+  useFrame(() => {
+    const size = gl.getDrawingBufferSize(new Vector2());
+    if (!size.equals(targetSize)) {
+      gl.setDrawingBufferSize(targetSize.x, targetSize.y, 1);
+    }
+  });
+
+  return null;
+}
+
 softShadows({
   frustum: 3.75, // Frustum width (default: 3.75) must be a float
   size: 0.005, // World size (default: 0.005) must be a float
@@ -579,6 +593,7 @@ export default function App() {
 
   return (
     <Canvas style={{ backgroundColor: "#121212" }} shadows>
+      <ViewportResize />
       <Stats
         showPanel={0} // Start-up panel (default=0)
         className="stats" // Optional className to add to the stats container dom element
