@@ -38,6 +38,7 @@ import {
   Euler,
   Event,
   Group,
+  Matrix4,
   Mesh,
   Object3D,
   Quaternion,
@@ -257,23 +258,21 @@ const useStore = create<AppState>((set, get) => ({
   },
 }));
 
-function generateFibonacciSphere(samples = 128) {
-  const points: Vector3[] = [];
+function generateFibonacciSphere() {
+  const samples = 64;
+  const radius = 1.5;
 
-  const pi2 = 2 * Math.PI;
-  const phi = (Math.sqrt(5) + 1) / 2 - 1; // golden ratio
-  const ga = phi * pi2; // golden angle
+  const points = [];
+  const offset = 2 / samples;
+  const increment = Math.PI * (3 - Math.sqrt(5));
 
-  for (let i = 1; i <= samples; ++i) {
-    let lon = ga * i;
-    lon /= pi2;
-    lon -= Math.floor(lon);
-    lon *= pi2;
-    if (lon > Math.PI) lon -= pi2;
-
-    const lat = Math.asin(-1 + (2 * i) / samples);
-
-    points.push(new Vector3(lat, lon, 1.5));
+  for (let i = 0; i < samples; i++) {
+    const y = i * offset - 1 + offset / 2;
+    const distance = Math.sqrt(1 - Math.pow(y, 2));
+    const phi = ((i + 1) % samples) * increment;
+    const x = Math.cos(phi) * distance;
+    const z = Math.sin(phi) * distance;
+    points.push(new Vector3(x * radius, y * radius, z * radius));
   }
 
   return points;
@@ -297,24 +296,12 @@ function getAngleFromInput(
   return [horizontalAngle, verticalAngle];
 }
 
-function orbitAround(orbitOffset: Vector3): [Euler, Vector3] {
-  const quaternionX = new Quaternion();
-  quaternionX.setFromAxisAngle(new Vector3(1, 0, 0), orbitOffset.x);
+function lookAt(eye: Vector3, target: Vector3): [Euler, Vector3] {
+  const up = new Vector3(0, 1, 0);
+  const lookAt = new Matrix4().lookAt(eye, target, up);
+  const rotation = new Euler().setFromRotationMatrix(lookAt);
 
-  const quaternionY = new Quaternion();
-  quaternionY.setFromAxisAngle(new Vector3(0, 1, 0), orbitOffset.y);
-
-  const quaternion = quaternionX.multiply(quaternionY);
-
-  const euler = new Euler();
-  euler.setFromQuaternion(quaternion);
-
-  const translationOffset = new Vector3(0, 0, orbitOffset.z);
-
-  // Use quaternion to rotate the relative vector.
-  const translation = translationOffset.applyQuaternion(quaternion);
-
-  return [euler, translation];
+  return [rotation, eye];
 }
 
 function PlayerGroup() {
@@ -459,9 +446,10 @@ function BrickMesh({ brick }: { brick: Brick }) {
   const removeOutlineSelection = useStore(
     (state) => state.actions.removeOutlineSelection
   );
-  const [rotation, position] = useMemo(() => orbitAround(brick.orbitOffset), [
-    brick,
-  ]);
+  const [rotation, position] = useMemo(
+    () => lookAt(brick.orbitOffset, new Vector3()),
+    [brick]
+  );
   const brickSize: [number, number, number] = [0.4, 0.4, 0.1];
   const [ref] = useBox(
     () => ({
