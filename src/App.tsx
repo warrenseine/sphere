@@ -318,11 +318,23 @@ function orbitAround(orbitOffset: Vector3): [Euler, Vector3] {
 }
 
 function SphereMesh() {
+  const addOutlineSelection = useStore(
+    (state) => state.actions.addOutlineSelection
+  );
+  const removeOutlineSelection = useStore(
+    (state) => state.actions.removeOutlineSelection
+  );
+
   const [ref] = useSphere(() => ({
     args: 1, // radius
     mass: 1,
     type: "Static",
   }));
+
+  useEffect(() => {
+    addOutlineSelection(ref);
+    return () => removeOutlineSelection(ref);
+  }, [ref, addOutlineSelection, removeOutlineSelection]);
 
   return (
     <mesh position={[0, 0, 0]} ref={ref} receiveShadow>
