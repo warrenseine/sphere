@@ -398,7 +398,6 @@ function PlayerGroup() {
       <RoundedBox
         args={padSize} // Width, Height and Depth of the box
         radius={0.05} // Border-Radius of the box
-        smoothness={8} // Optional, number of subdivisions
         ref={ref as Ref<Mesh>} // All THREE.Mesh props are valid
         receiveShadow
       >
@@ -499,7 +498,6 @@ function BrickMesh({ brick }: { brick: Brick }) {
     <RoundedBox
       args={brickSize} // Width, Height and Depth of the box
       radius={0.05} // Border-Radius of the box
-      smoothness={8} // Optional, number of subdivisions
       ref={ref as Ref<Mesh>} // All THREE.Mesh props are valid
       receiveShadow
     >
