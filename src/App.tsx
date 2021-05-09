@@ -113,20 +113,17 @@ const createBrick = (brickId: number, orbitOffset: Vector3): Brick => ({
   color: getBallColor(brickId),
 });
 
-const createRandomBrick = (brickId: number): Brick => {
+const getRandomBrickPosition = (): Vector3 => {
   const brickWidth = 0.4;
   const brickGap = 0.2;
   const maxBricks = Math.floor((2 * Math.PI) / (brickWidth + brickGap));
   const positionX = Math.floor(Math.random() * maxBricks);
   const positionY = Math.floor(Math.random() * maxBricks);
 
-  return createBrick(
-    brickId,
-    new Vector3(
-      positionX * (brickWidth + brickGap) + brickGap / 2,
-      positionY * (brickWidth + brickGap) + brickGap / 2,
-      1.5
-    )
+  return new Vector3(
+    positionX * (brickWidth + brickGap) + brickGap / 2,
+    positionY * (brickWidth + brickGap) + brickGap / 2,
+    1.5
   );
 };
 
@@ -141,7 +138,9 @@ interface AppState extends State {
   actions: {
     addBall: () => void;
     removeBrick: (brickId: number) => void;
+    addBrick: (position: Vector3) => void;
     addRandomBrick: () => void;
+    addDefaultBricks: () => void;
     updateBrick: (brickId: number, changes: Partial<Brick>) => void;
     movePlayer: (
       delta: number,
@@ -175,14 +174,29 @@ const useStore = create<AppState>((set, get) => ({
       }),
     removeBrick: (brickId: number) =>
       set((state) => ({ bricks: state.bricks.delete(brickId) })),
-    addRandomBrick: () =>
+    addRandomBrick: () => {
+      const {
+        actions: { addBrick },
+      } = get();
+      addBrick(getRandomBrickPosition());
+    },
+    addBrick: (position: Vector3) =>
       set((state) => {
-        const brick = createRandomBrick(state.nextBrickId);
+        const brick = createBrick(state.nextBrickId, position);
         return {
           bricks: state.bricks.set(brick.brickId, brick),
           nextBrickId: state.nextBrickId + 1,
         };
       }),
+    addDefaultBricks: () => {
+      const {
+        actions: { addBrick },
+      } = get();
+      set((state) => {
+        const points = generateFibonacciSphere();
+        points.forEach(addBrick);
+      });
+    },
     updateBrick: (brickId: number, changes: Partial<Brick>) =>
       set((state) => ({
         bricks: state.bricks.update(brickId, (value) => ({
@@ -236,12 +250,34 @@ const useStore = create<AppState>((set, get) => ({
       })),
     resetGame: () => {
       const {
-        actions: { addRandomBrick },
+        actions: { addDefaultBricks },
       } = get();
-      [...Array(16)].forEach(addRandomBrick);
+      addDefaultBricks();
     },
   },
 }));
+
+function generateFibonacciSphere(samples = 128) {
+  const points: Vector3[] = [];
+
+  const pi2 = 2 * Math.PI;
+  const phi = (Math.sqrt(5) + 1) / 2 - 1; // golden ratio
+  const ga = phi * pi2; // golden angle
+
+  for (let i = 1; i <= samples; ++i) {
+    let lon = ga * i;
+    lon /= pi2;
+    lon -= Math.floor(lon);
+    lon *= pi2;
+    if (lon > Math.PI) lon -= pi2;
+
+    const lat = Math.asin(-1 + (2 * i) / samples);
+
+    points.push(new Vector3(lat, lon, 1.5));
+  }
+
+  return points;
+}
 
 function getAngleFromInput(
   leftPressed: boolean,
