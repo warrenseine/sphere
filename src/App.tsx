@@ -51,10 +51,12 @@ import { useKeyDown, useKeyPress, useTouch, TouchPosition } from "./useInput";
 
 type Player = {
   orientation: Quaternion;
+  color: string;
 };
 
 const createPlayer = (): Player => ({
   orientation: new Quaternion(),
+  color: getBallColor(Math.floor(Math.random() * ballColors.length)),
 });
 
 const ballColors = [
@@ -78,17 +80,6 @@ type Ball = {
   ballId: number;
 };
 
-const createBall = (
-  ballId: number,
-  position: Vector3,
-  velocity: Vector3
-): Ball => ({
-  ballId,
-  position,
-  velocity,
-  color: getBallColor(ballId),
-});
-
 const createBallFromPlayer = (ballId: number, player: Player): Ball => {
   const translation = new Vector3(0, 0, 3);
   const direction = new Vector3(0, 0, -1);
@@ -98,7 +89,12 @@ const createBallFromPlayer = (ballId: number, player: Player): Ball => {
     .applyQuaternion(player.orientation)
     .multiplyScalar(2);
 
-  return createBall(ballId, position, velocity);
+  return {
+    ballId,
+    position,
+    velocity,
+    color: player.color,
+  };
 };
 
 type Brick = {
@@ -239,6 +235,7 @@ const useStore = create<AppState>((set, get) => ({
 
         return {
           player: {
+            ...state.player,
             orientation,
           },
         };
@@ -440,6 +437,8 @@ function BrickGroup() {
 }
 
 function BrickMesh({ brick }: { brick: Brick }) {
+  const playerColor = useStore((state) => state.player.color);
+  const updateBrick = useStore((state) => state.actions.updateBrick);
   const addOutlineSelection = useStore(
     (state) => state.actions.addOutlineSelection
   );
@@ -458,9 +457,17 @@ function BrickMesh({ brick }: { brick: Brick }) {
       position: position.toArray(),
       rotation: rotation.toArray(),
       type: "Static",
+      onCollide: collide,
     }),
     undefined,
     [rotation, position]
+  );
+
+  const collide = useCallback(
+    (e: Event) => {
+      updateBrick(brick.brickId, { color: playerColor });
+    },
+    [updateBrick, brick, playerColor]
   );
 
   useEffect(() => {
