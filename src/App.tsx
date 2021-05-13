@@ -37,7 +37,6 @@ import {
   Camera,
   Euler,
   Event,
-  Group,
   Matrix4,
   Mesh,
   Object3D,
@@ -302,24 +301,17 @@ function lookAt(eye: Vector3, target: Vector3): [Euler, Vector3] {
 }
 
 function PlayerGroup() {
-  const addOutlineSelection = useStore(
-    (state) => state.actions.addOutlineSelection
-  );
-  const removeOutlineSelection = useStore(
-    (state) => state.actions.removeOutlineSelection
-  );
   const leftPressed = useKeyDown(KEY_LEFT);
   const rightPressed = useKeyDown(KEY_RIGHT);
   const upPressed = useKeyDown(KEY_UP);
   const downPressed = useKeyDown(KEY_DOWN);
   const touchPosition = useTouch();
-  const padGroup = useRef<Group>(null!);
   const camera = useRef<Camera>(null!);
   const player = useStore((state) => state.player);
   const movePlayer = useStore((state) => state.actions.movePlayer);
   const addBall = useStore((state) => state.actions.addBall);
-  const padSize: [number, number, number] = [1, 0.2, 0.1];
-  const translation = new Vector3(0, 0, 4);
+  const padSize: [number, number, number] = [2, 2, 0.1];
+  const translation = new Vector3(0, 0, 5);
 
   const [ref, api] = useBox(() => ({
     args: padSize,
@@ -357,28 +349,9 @@ function PlayerGroup() {
     return () => mesh.removeEventListener("collide", collide);
   }, [ref, collide]);
 
-  useEffect(() => {
-    addOutlineSelection(ref);
-    return () => removeOutlineSelection(ref);
-  }, [ref, addOutlineSelection, removeOutlineSelection]);
-
   return (
-    <group ref={padGroup} position={[0, 0, 0]}>
-      <RoundedBox
-        args={padSize} // Width, Height and Depth of the box
-        radius={0.05} // Border-Radius of the box
-        ref={ref as Ref<Mesh>} // All THREE.Mesh props are valid
-        onClick={addBall}
-        receiveShadow
-      >
-        <meshToonMaterial attach="material" color="#f3f3f3" />
-        <PerspectiveCamera
-          makeDefault
-          ref={camera}
-          position={[0, 1, 2]}
-          rotation={[-Math.PI / 16, 0, 0]}
-        />
-      </RoundedBox>
+    <group ref={ref}>
+      <PerspectiveCamera makeDefault ref={camera} position={[0, 0, 1]} />
     </group>
   );
 }
@@ -538,11 +511,6 @@ function Effects() {
     </Suspense>
   );
 }
-// colored bricks all around the sphere
-// color combination to build
-// special bricks to add new colors to other players
-// special brick to shuffle players
-// color bricks (splatoon style)
 
 function ViewportResize() {
   const { gl, viewport } = useThree();
