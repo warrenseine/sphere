@@ -514,7 +514,7 @@ function Effects() {
 
 function ViewportResize() {
   const { gl, viewport } = useThree();
-  const targetSize = new Vector2(1024, 1024 / viewport.aspect);
+  const targetSize = new Vector2(1920, 1920 / viewport.aspect);
 
   useFrame(() => {
     const size = gl.getDrawingBufferSize(new Vector2());
