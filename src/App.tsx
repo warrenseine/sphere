@@ -16,7 +16,7 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { List, Map, Set } from "immutable";
-import { KEY_G, KEY_SPACE } from "keycode-js";
+import { CODE_G, CODE_SPACE } from "keycode-js";
 import {
   MutableRefObject,
   Ref,
@@ -264,7 +264,7 @@ function PlayerGroup() {
 
   const collide = useCallback((e: Event) => {}, []);
 
-  useKeyPress(KEY_SPACE, addBall);
+  useKeyPress(CODE_SPACE, addBall);
 
   useTouch({ onUp: addBall });
 
@@ -428,7 +428,7 @@ function Effects() {
         ),
     [outlineSelection]
   );
-  const gPressed = useKeyDown(KEY_G);
+  const gPressed = useKeyDown(CODE_G);
 
   return (
     <Suspense fallback={null}>

@@ -1,24 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 
-export function useKeyDown(targetKeyCode: number): boolean {
+export function useKeyDown(targetCode: string): boolean {
   const [keyPressed, setKeyPressed] = useState(false);
 
   const keyDown = useCallback(
-    ({ keyCode }) => {
-      if (keyCode === targetKeyCode) {
+    ({ code }: KeyboardEvent) => {
+      if (code === targetCode) {
         setKeyPressed(true);
       }
     },
-    [targetKeyCode]
+    [targetCode]
   );
 
   const keyUp = useCallback(
-    ({ keyCode }) => {
-      if (keyCode === targetKeyCode) {
+    ({ code }: KeyboardEvent) => {
+      if (code === targetCode) {
         setKeyPressed(false);
       }
     },
-    [targetKeyCode]
+    [targetCode]
   );
 
   useEffect(() => {
@@ -33,14 +33,14 @@ export function useKeyDown(targetKeyCode: number): boolean {
   return keyPressed;
 }
 
-export function useKeyPress(targetKeyCode: number, callback: () => void): void {
+export function useKeyPress(targetCode: string, callback: () => void): void {
   const keyPress = useCallback(
-    ({ keyCode }) => {
-      if (keyCode === targetKeyCode) {
+    ({ code }: KeyboardEvent) => {
+      if (code === targetCode) {
         callback();
       }
     },
-    [targetKeyCode, callback]
+    [targetCode, callback]
   );
 
   useEffect(() => {
