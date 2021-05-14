@@ -294,17 +294,30 @@ function PlayerGroup() {
 
 function BallGroup(props: JSX.IntrinsicElements["group"]) {
   const balls = useStore((state) => state.balls);
+  const ambientIntensity = balls.size > 0 ? 0 : 0.6;
+  const pointIntensity = balls.size > 0 ? 0.6 / balls.size : 0;
 
   return (
     <group {...props}>
+      <ambientLight intensity={ambientIntensity} />
       {balls.map((ball) => (
-        <BallMesh key={ball.ballId} ball={ball} />
+        <BallMesh
+          key={ball.ballId}
+          ball={ball}
+          lightIntensity={pointIntensity}
+        />
       ))}
     </group>
   );
 }
 
-function BallMesh({ ball }: { ball: Ball }) {
+function BallMesh({
+  ball,
+  lightIntensity,
+}: {
+  ball: Ball;
+  lightIntensity: number;
+}) {
   const addOutlineSelection = useStore(
     (state) => state.actions.addOutlineSelection
   );
@@ -329,6 +342,12 @@ function BallMesh({ ball }: { ball: Ball }) {
     <mesh ref={ref} scale={ballRadius} castShadow>
       <sphereGeometry args={[1, 16, 16]} />
       <meshToonMaterial attach="material" color={ball.color} />
+      <pointLight
+        intensity={lightIntensity}
+        castShadow
+        shadow-mapSize-width={256}
+        shadow-mapSize-height={256}
+      />
     </mesh>
   );
 }
@@ -489,12 +508,6 @@ export default function App() {
           restitution: 1.1,
         }}
       >
-        <pointLight
-          position={[30, 10, 10]}
-          castShadow
-          shadow-mapSize-width={256}
-          shadow-mapSize-height={256}
-        />
         <BallGroup />
         <BrickGroup />
         <PlayerGroup />
