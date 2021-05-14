@@ -16,7 +16,7 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { List, Map, Set } from "immutable";
-import { CODE_G, CODE_SPACE } from "keycode-js";
+import { CODE_G, CODE_R, CODE_SPACE } from "keycode-js";
 import {
   MutableRefObject,
   Ref,
@@ -174,10 +174,8 @@ const useStore = create<AppState>((set, get) => ({
       const {
         actions: { addBrick },
       } = get();
-      set((state) => {
-        const points = generateFibonacciSphere();
-        points.forEach(addBrick);
-      });
+      const points = generateFibonacciSphere();
+      points.forEach(addBrick);
     },
     updateBrick: (brickId: number, changes: Partial<Brick>) =>
       set((state) => ({
@@ -203,6 +201,10 @@ const useStore = create<AppState>((set, get) => ({
       const {
         actions: { addDefaultBricks },
       } = get();
+      set((state) => ({
+        balls: state.balls.clear(),
+        bricks: state.bricks.clear(),
+      }));
       addDefaultBricks();
     },
   },
@@ -494,6 +496,7 @@ export default function App() {
   const resetGame = useStore(resetGameSelector);
 
   useEffect(resetGame, [resetGame]);
+  useKeyPress(CODE_R, resetGame);
 
   return (
     <Canvas style={{ backgroundColor: "#121212" }} shadows>
