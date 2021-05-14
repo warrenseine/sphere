@@ -208,6 +208,15 @@ const useStore = create<AppState>((set, get) => ({
   },
 }));
 
+const addOutlineSelectionSelector = (state: AppState) =>
+  state.actions.addOutlineSelection;
+const removeOutlineSelectionSelector = (state: AppState) =>
+  state.actions.removeOutlineSelection;
+const setPlayerSelector = (state: AppState) => state.actions.setPlayer;
+const addBallSelector = (state: AppState) => state.actions.addBall;
+const updateBrickSelector = (state: AppState) => state.actions.updateBrick;
+const resetGameSelector = (state: AppState) => state.actions.resetGame;
+
 function generateFibonacciSphere() {
   const samples = 64;
   const radius = 1.5;
@@ -239,8 +248,8 @@ function lookAt(eye: Vector3, target: Vector3): [Euler, Vector3] {
 function PlayerGroup() {
   const controls = useRef<OrbitControlsImpl>(null!);
   const camera = useThree(({ camera }) => camera);
-  const setPlayer = useStore((state) => state.actions.setPlayer);
-  const addBall = useStore((state) => state.actions.addBall);
+  const setPlayer = useStore(setPlayerSelector);
+  const addBall = useStore(addBallSelector);
   const padSize: [number, number, number] = [2, 2, 0.1];
   const translation = new Vector3(0, 0, 5);
 
@@ -318,12 +327,8 @@ function BallMesh({
   ball: Ball;
   lightIntensity: number;
 }) {
-  const addOutlineSelection = useStore(
-    (state) => state.actions.addOutlineSelection
-  );
-  const removeOutlineSelection = useStore(
-    (state) => state.actions.removeOutlineSelection
-  );
+  const addOutlineSelection = useStore(addOutlineSelectionSelector);
+  const removeOutlineSelection = useStore(removeOutlineSelectionSelector);
   const ballRadius = 0.2;
 
   const [ref] = useSphere(() => ({
@@ -366,13 +371,9 @@ function BrickGroup() {
 
 function BrickMesh({ brick }: { brick: Brick }) {
   const playerColor = useStore((state) => state.player.color);
-  const updateBrick = useStore((state) => state.actions.updateBrick);
-  const addOutlineSelection = useStore(
-    (state) => state.actions.addOutlineSelection
-  );
-  const removeOutlineSelection = useStore(
-    (state) => state.actions.removeOutlineSelection
-  );
+  const updateBrick = useStore(updateBrickSelector);
+  const addOutlineSelection = useStore(addOutlineSelectionSelector);
+  const removeOutlineSelection = useStore(removeOutlineSelectionSelector);
   const [rotation, position] = useMemo(
     () => lookAt(brick.orbitOffset, new Vector3()),
     [brick]
@@ -490,7 +491,8 @@ softShadows({
 });
 
 export default function App() {
-  const resetGame = useStore((state) => state.actions.resetGame);
+  const resetGame = useStore(resetGameSelector);
+
   useEffect(resetGame, [resetGame]);
 
   return (
