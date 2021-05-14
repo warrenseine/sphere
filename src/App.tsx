@@ -1,7 +1,7 @@
 import { Physics, useBox, useSphere } from "@react-three/cannon";
 import {
   AdaptiveDpr,
-  PerspectiveCamera,
+  OrbitControls,
   RoundedBox,
   softShadows,
   Stars,
@@ -16,14 +16,7 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { List, Map, Set } from "immutable";
-import {
-  KEY_DOWN,
-  KEY_G,
-  KEY_LEFT,
-  KEY_RIGHT,
-  KEY_SPACE,
-  KEY_UP,
-} from "keycode-js";
+import { KEY_G, KEY_SPACE } from "keycode-js";
 import {
   MutableRefObject,
   Ref,
@@ -34,7 +27,6 @@ import {
   useRef,
 } from "react";
 import {
-  Camera,
   Euler,
   Event,
   Matrix4,
@@ -44,9 +36,10 @@ import {
   Vector2,
   Vector3,
 } from "three";
+import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import create, { State } from "zustand";
 import "./App.css";
-import { useKeyDown, useKeyPress, useTouch, TouchPosition } from "./useInput";
+import { useKeyDown, useKeyPress, useTouch } from "./useInput";
 
 type Player = {
   orientation: Quaternion;
@@ -138,14 +131,7 @@ interface AppState extends State {
     addRandomBrick: () => void;
     addDefaultBricks: () => void;
     updateBrick: (brickId: number, changes: Partial<Brick>) => void;
-    movePlayer: (
-      delta: number,
-      leftPressed: boolean,
-      rightPressed: boolean,
-      upPressed: boolean,
-      downPressed: boolean,
-      touchPosition: TouchPosition
-    ) => void;
+    setPlayer: (changes: Partial<Player>) => void;
     addOutlineSelection: (mesh: Object3DRef) => void;
     removeOutlineSelection: (mesh: Object3DRef) => void;
     resetGame: () => void;
@@ -200,45 +186,13 @@ const useStore = create<AppState>((set, get) => ({
           ...changes,
         })),
       })),
-    movePlayer: (
-      delta: number,
-      leftPressed: boolean,
-      rightPressed: boolean,
-      upPressed: boolean,
-      downPressed: boolean,
-      touchPosition: TouchPosition
-    ) =>
-      set((state) => {
-        const [horizontalAngle, verticalAngle] = getAngleFromInput(
-          leftPressed,
-          rightPressed,
-          upPressed,
-          downPressed,
-          touchPosition
-        );
-        const verticalAxis = new Vector3(-1, 0, 0);
-        const verticalRotation = new Quaternion().setFromAxisAngle(
-          verticalAxis,
-          verticalAngle * delta
-        );
-        const horizontalAxis = new Vector3(0, 1, 0);
-        const horizontalRotation = new Quaternion().setFromAxisAngle(
-          horizontalAxis,
-          horizontalAngle * delta
-        );
-
-        const orientation = state.player.orientation
-          .clone()
-          .multiply(verticalRotation)
-          .multiply(horizontalRotation);
-
-        return {
-          player: {
-            ...state.player,
-            orientation,
-          },
-        };
-      }),
+    setPlayer: (changes: Partial<Player>) =>
+      set((state) => ({
+        player: {
+          ...state.player,
+          ...changes,
+        },
+      })),
     addOutlineSelection: (mesh: Object3DRef) =>
       set((state) => ({ outlineSelection: state.outlineSelection.add(mesh) })),
     removeOutlineSelection: (mesh: Object3DRef) =>
@@ -274,24 +228,6 @@ function generateFibonacciSphere() {
   return points;
 }
 
-function getAngleFromInput(
-  leftPressed: boolean,
-  rightPressed: boolean,
-  upPressed: boolean,
-  downPressed: boolean,
-  touchPosition: TouchPosition
-): [number, number] {
-  if (touchPosition) {
-    const verticalAngle =
-      ((window.innerHeight - touchPosition.y) / window.innerHeight - 0.5) * 2;
-    const horizontalAngle = (touchPosition.x / window.innerWidth - 0.5) * 2;
-    return [horizontalAngle, verticalAngle];
-  }
-  const verticalAngle = downPressed ? -1 : upPressed ? 1 : 0;
-  const horizontalAngle = leftPressed ? -1 : rightPressed ? 1 : 0;
-  return [horizontalAngle, verticalAngle];
-}
-
 function lookAt(eye: Vector3, target: Vector3): [Euler, Vector3] {
   const up = new Vector3(0, 1, 0);
   const lookAt = new Matrix4().lookAt(eye, target, up);
@@ -301,14 +237,9 @@ function lookAt(eye: Vector3, target: Vector3): [Euler, Vector3] {
 }
 
 function PlayerGroup() {
-  const leftPressed = useKeyDown(KEY_LEFT);
-  const rightPressed = useKeyDown(KEY_RIGHT);
-  const upPressed = useKeyDown(KEY_UP);
-  const downPressed = useKeyDown(KEY_DOWN);
-  const touchPosition = useTouch();
-  const camera = useRef<Camera>(null!);
-  const player = useStore((state) => state.player);
-  const movePlayer = useStore((state) => state.actions.movePlayer);
+  const controls = useRef<OrbitControlsImpl>(null!);
+  const camera = useThree(({ camera }) => camera);
+  const setPlayer = useStore((state) => state.actions.setPlayer);
   const addBall = useStore((state) => state.actions.addBall);
   const padSize: [number, number, number] = [2, 2, 0.1];
   const translation = new Vector3(0, 0, 5);
@@ -326,21 +257,17 @@ function PlayerGroup() {
 
   useKeyPress(KEY_SPACE, addBall);
 
-  useFrame((state, delta) => {
-    movePlayer(
-      delta,
-      leftPressed,
-      rightPressed,
-      upPressed,
-      downPressed,
-      touchPosition
-    );
+  useTouch({ onUp: addBall });
 
-    const rotation = new Euler().setFromQuaternion(player.orientation);
-    const position = translation.clone().applyQuaternion(player.orientation);
+  useFrame((state, delta) => {
+    const orientation = camera.getWorldQuaternion(new Quaternion());
+    const rotation = new Euler().setFromQuaternion(orientation);
+    const position = camera.getWorldPosition(new Vector3());
 
     api.rotation.copy(rotation);
     api.position.copy(position);
+
+    setPlayer({ orientation });
   });
 
   useEffect(() => {
@@ -350,8 +277,17 @@ function PlayerGroup() {
   }, [ref, collide]);
 
   return (
-    <group ref={ref}>
-      <PerspectiveCamera makeDefault ref={camera} position={[0, 0, 1]} />
+    <group>
+      <OrbitControls
+        ref={controls}
+        minZoom={6}
+        maxZoom={6}
+        enablePan={false}
+        enableZoom={false}
+        enableRotate={true}
+        enableDamping={true}
+        camera={camera}
+      />
     </group>
   );
 }

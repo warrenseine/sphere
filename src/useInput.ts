@@ -51,51 +51,98 @@ export function useKeyPress(targetKeyCode: number, callback: () => void): void {
   }, [keyPress]);
 }
 
-export type TouchPosition = { x: number, y: number} | undefined
+export type TouchPosition = { x: number; y: number } | undefined;
 
-export function useTouch(): TouchPosition {
-  const [touchDown, setTouchDown] = useState<boolean>(false);
-  const [touchPosition, setTouchPosition] = useState<TouchPosition>();
+export type TouchState = {
+  down: boolean;
+  position: TouchPosition;
+  offset: TouchPosition;
+};
 
-  const handleMouseDown = useCallback((event: MouseEvent) => {
-    setTouchPosition({ x: event.clientX, y: event.clientY });
-    setTouchDown(true);
-  }, [setTouchPosition, setTouchDown]);
+type UseTouchOptions = {
+  onUp: (() => void) | undefined;
+};
 
-  const handleMouseMove = useCallback((event: MouseEvent) => {
-    if (touchDown) setTouchPosition({ x: event.clientX, y: event.clientY });
-  }, [setTouchPosition, touchDown]);
+export function useTouch(options?: UseTouchOptions): TouchState {
+  const [down, setDown] = useState<boolean>(false);
+  const [position, setPosition] = useState<TouchPosition>();
+  const [previousPosition, setPreviousPosition] = useState<TouchPosition>();
+  const [initialPosition, setInitialPosition] = useState<TouchPosition>();
 
-  const handleTouchStart = useCallback((event: TouchEvent) => {
-    setTouchPosition({ x: event.touches[0].clientX, y: event.touches[0].clientY });
-    setTouchDown(true);
-  }, [setTouchPosition, setTouchDown]);
+  const handlePointerDown = useCallback(
+    (event: PointerEvent) => {
+      setInitialPosition({ x: event.clientX, y: event.clientY });
+      setPreviousPosition({ x: event.clientX, y: event.clientY });
+      setPosition({ x: event.clientX, y: event.clientY });
+      setDown(true);
+    },
+    [setPosition, setInitialPosition, setPreviousPosition, setDown]
+  );
 
-  const handleTouchMove = useCallback((event: TouchEvent) => {
-    if (touchDown) setTouchPosition({ x: event.touches[0].clientX, y: event.touches[0].clientY });
-  }, [setTouchPosition, touchDown]);
+  const handlePointerMove = useCallback(
+    (event: PointerEvent) => {
+      if (down) {
+        setPreviousPosition(position);
+        setPosition({ x: event.clientX, y: event.clientY });
+      }
+    },
+    [setPosition, setPreviousPosition, position, down]
+  );
 
-  const handleTouchEnd = useCallback(() => {
-    setTouchPosition(undefined);
-    setTouchDown(false);
-  }, [setTouchPosition, setTouchDown]);
+  const handlePointerUp = useCallback(() => {
+    if (
+      position &&
+      initialPosition &&
+      Math.abs(position.x - initialPosition.x) < 10 &&
+      Math.abs(position.y - initialPosition.y) < 10 &&
+      options?.onUp
+    ) {
+      options.onUp();
+    }
+
+    setPosition(undefined);
+    setPreviousPosition(undefined);
+    setInitialPosition(undefined);
+    setDown(false);
+  }, [
+    options,
+    position,
+    initialPosition,
+    setPosition,
+    setPreviousPosition,
+    setInitialPosition,
+    setDown,
+  ]);
 
   useEffect(() => {
-    window.addEventListener("touchstart", handleTouchStart);
-    window.addEventListener("touchmove", handleTouchMove);
-    window.addEventListener("touchend", handleTouchEnd);
-    window.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleTouchEnd);
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
     return () => {
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
-      window.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleTouchEnd);
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseDown, handleMouseMove]);
+  }, [handlePointerDown, handlePointerMove, handlePointerUp]);
 
-  return touchPosition;
+  return {
+    down: down,
+    position: position,
+    offset:
+      position && previousPosition
+        ? {
+            x: position.x - previousPosition.x,
+            y: position.y - previousPosition.y,
+          }
+        : { x: 0, y: 0 },
+  };
+}
+
+export function useClick(callback: (e: MouseEvent) => void): void {
+  useEffect(() => {
+    window.addEventListener("click", callback);
+    return () => {
+      window.removeEventListener("click", callback);
+    };
+  }, [callback]);
 }
